@@ -1,3 +1,7 @@
+/* eslint-disable camelcase */
+/* eslint-disable no-var */
+/* eslint-disable no-unused-vars */
+/* eslint-disable prettier/prettier */
 require('dotenv-safe').config()
 const express = require('express')
 const bodyParser = require('body-parser')
@@ -10,7 +14,8 @@ const app = express()
 const i18n = require('i18n')
 const initMongo = require('./config/mongo')
 const path = require('path')
-global.CronJob = require('./database-backup/cron.js');
+global.CronJob = require('./database-backup/cron.js')
+const WebSocket = require('ws')
 
 // Setup express server port from ENV, default: 3000
 app.set('port', process.env.PORT || 3000)
@@ -36,6 +41,48 @@ if (process.env.USE_REDIS === 'true') {
   app.use(cache)
 }
 
+const ws = new WebSocket('wss://stream.binance.com:9443/ws')
+
+var high = 0;
+var low = 0;
+
+var oldhigh = 0;
+var oldlow = 0;
+ws.on('open', () => {
+  const data = {
+    method: 'SUBSCRIBE',
+    params: ['xrpusdt@ticker'],
+    id: 1
+  }
+  ws.send(JSON.stringify(data))
+})
+ws.on('message', (data, flags) => {
+  const get_data = JSON.parse(data)
+  if (get_data.c !== undefined) {
+    if (high === 0 && low === 0) {
+      high = get_data.c
+      low = get_data.c
+    } else if (high < get_data?.c) {
+      console.log(high, low, "asdf")
+      high = get_data?.c
+      console.log("high")
+    } else if (low > get_data.c) {
+      console.log(high, low, "asdf")
+      console.log("low")
+      low = get_data?.c
+    } else {
+      console.log(high, low, "asdf")
+      high = get_data?.c
+      console.log("high")
+    }
+  }
+
+
+  // flags.binary will be set if a binary data is received
+  // flags.masked will be set if the data was masked
+})
+
+console.log(high, low, 'low')
 // for parsing json
 app.use(
   bodyParser.json({
@@ -70,7 +117,7 @@ app.engine('html', require('ejs').renderFile)
 app.set('view engine', 'html')
 app.use(require('./app/routes'))
 app.listen(app.get('port'))
-//An error handling middleware
+// An error handling middleware
 process.on('uncaughtException', (error, origin) => {
   console.log('----- Uncaught exception -----')
   console.log(error)
